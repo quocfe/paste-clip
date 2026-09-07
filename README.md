@@ -2,7 +2,7 @@
 
 A native, local-only clipboard manager for macOS 13+. SwiftUI + AppKit, SQLite/GRDB, FTS5 search, and a keyboard-first history panel.
 
-**Implementation status:** the MVP source, macOS tests, Xcode project generator, and release tooling are included. This project was authored on Windows; the native application has **not yet been compiled, launched, or visually verified on macOS**. Portable SQL tests pass. Run the macOS build and manual checks below before treating this as a release. No GitHub release or Homebrew tap has been published.
+**Implementation status:** the MVP source, macOS tests, Xcode project generator, and release tooling are included. The native application has compiled successfully on GitHub's macOS runner, and all 13 Swift tests and four portable SQL tests passed. See the [macOS CI runs](https://github.com/quocfe/paste-clip/actions/workflows/ci.yml) for the latest packaging status. Interactive launch, visual review, and cross-app paste still require manual verification on a Mac before release. No signed GitHub release or Homebrew tap has been published.
 
 ## Build and run on a Mac
 
@@ -102,7 +102,7 @@ The Swift suite contains 13 tests for persistence, deduplication/pins, FTS trigg
 
 The portable validator executes the **actual migration and cleanup SQL extracted from the Swift repository**. Its four tests pass on the Windows development host, including a 50,000-row FTS query. That SQL timing is not a measurement of native UI latency.
 
-GitHub Actions on `macos-15` runs the Swift suite, creates a universal `.app`, verifies both architectures, and uploads an ad-hoc signed development build artifact. The workflow is prepared but has not been run from this workspace.
+GitHub Actions on `macos-15` runs the Swift suite, creates a universal `.app`, verifies both architectures, and uploads an ad-hoc signed development build artifact. Download `ClipStack-development` from a successful workflow run; it contains `ClipStack-development.zip` with the application bundle.
 
 Before release, perform these macOS checks:
 

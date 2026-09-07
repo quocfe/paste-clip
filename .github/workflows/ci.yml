@@ -19,7 +19,7 @@ jobs:
       - name: Test and build universal application
         run: bash scripts/build.sh
       - name: Verify architectures
-        run: lipo -verify_arch arm64 x86_64 build/DerivedData/Build/Products/Release/ClipStack.app/Contents/MacOS/ClipStack
+        run: lipo build/DerivedData/Build/Products/Release/ClipStack.app/Contents/MacOS/ClipStack -verify_arch arm64 x86_64
       - name: Package ad-hoc signed development build
         run: ditto -c -k --sequesterRsrc --keepParent build/DerivedData/Build/Products/Release/ClipStack.app build/ClipStack-development.zip
       - uses: actions/upload-artifact@v4

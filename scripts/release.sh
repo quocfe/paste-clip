@@ -31,7 +31,7 @@ xcodebuild -project ClipStack.xcodeproj -scheme ClipStack -configuration Release
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$APPLE_SIGNING_IDENTITY" \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" ENABLE_HARDENED_RUNTIME=YES archive
 APP='build/ClipStack.xcarchive/Products/Applications/ClipStack.app'
-lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/ClipStack"
+lipo "$APP/Contents/MacOS/ClipStack" -verify_arch arm64 x86_64
 codesign --verify --deep --strict --verbose=2 "$APP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" build/notarization.zip
 xcrun notarytool submit build/notarization.zip --apple-id "$APPLE_ID" \

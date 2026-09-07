@@ -31,10 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "ClipStack")
             let menu = NSMenu(); menu.delegate = self; item.menu = menu; statusItem = item
             keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                MainActor.assumeIsolated {
-                    guard let self else { return event }
-                    return self.handleKey(event)
+                let consumed = MainActor.assumeIsolated {
+                    guard let self else { return false }
+                    return self.handleKey(event) == nil
                 }
+                return consumed ? nil : event
             }
             if !state.settings.onboarded || state.error != nil { openHistory() }
         } catch {
