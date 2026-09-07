@@ -1,0 +1,35 @@
+name: Signed macOS release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-15
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+      - run: brew install xcodegen
+      - name: Build, sign, notarize, and package
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: bash scripts/release.sh
+      - name: Generate cask from verified archive
+        env:
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: python3 scripts/make_cask.py --version "${RELEASE_VERSION#v}" --repository "$REPOSITORY" --archive "build/ClipStack-${RELEASE_VERSION#v}.zip" --output build/clipstack.rb
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_VERSION" "build/ClipStack-${RELEASE_VERSION#v}.zip" build/SHA256SUMS build/clipstack.rb --verify-tag --generate-notes

@@ -1,0 +1,43 @@
+name: ClipStack
+options:
+  bundleIdPrefix: com.quocfe
+  deploymentTarget:
+    macOS: '13.0'
+packages:
+  ClipStackCore:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    MACOSX_DEPLOYMENT_TARGET: '13.0'
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+targets:
+  ClipStack:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/ClipStack
+      - path: Resources/ClipStack.icns
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - package: ClipStackCore
+        product: ClipStackCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.quocfe.ClipStack
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/ClipStack.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        COMBINE_HIDPI_IMAGES: YES
+schemes:
+  ClipStack:
+    build:
+      targets:
+        ClipStack: all
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,12 @@
+.build/
+.swiftpm/
+build/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+.DS_Store
+*.p12
+*.mobileprovision
+.env
+Resources/ClipStack.icns
+__pycache__/
