@@ -1,4 +1,5 @@
 import XCTest
+import GRDB
 @testable import ClipStackCore
 
 final class RepositoryTests: XCTestCase {
@@ -26,6 +27,14 @@ final class RepositoryTests: XCTestCase {
         XCTAssertEqual(result[0].updatedAt, Date(timeIntervalSince1970: 200))
         XCTAssertEqual(result[0].useCount, 2)
     }
+    func testDelayedDuplicateDoesNotMoveRecentCopyBackwards() async throws {
+        let (repo, _) = try setupStore()
+        try await repo.save(clip("same image", now: Date(timeIntervalSince1970: 200)))
+        try await repo.save(clip("same image", now: Date(timeIntervalSince1970: 100)))
+        let result = try await repo.search()
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.updatedAt, Date(timeIntervalSince1970: 200))
+    }
     func testFTSSearchAndTriggers() async throws {
         let (repo, _) = try setupStore()
         let item = clip("docker compose up -d")
@@ -42,19 +51,64 @@ final class RepositoryTests: XCTestCase {
         let deleted = try await repo.search("docker")
         XCTAssertTrue(deleted.isEmpty)
     }
-    func testRetentionAndLimitProtectPins() async throws {
-        let (repo, _) = try setupStore()
-        let now = Date()
-        let old = clip("old", now: now.addingTimeInterval(-40 * 86400))
-        let pin = clip("keep forever", now: now.addingTimeInterval(-50 * 86400))
-        try await repo.save(old); try await repo.save(pin); try await repo.togglePin(pin.id)
-        for index in 0..<5 { try await repo.save(clip("new \(index)", now: now.addingTimeInterval(Double(index)))) }
-        try await repo.cleanup(retentionDays: 30, maxItems: 2, now: now)
+    func testTwentyClipLimitIncludesPinsAndMixedTypesAndDeletesOldAssets() async throws {
+        let (repo, storage) = try setupStore()
+        let oldImage = ClipboardItem(type: .image, plainText: "old screenshot", hash: "old-image", now: Date(timeIntervalSince1970: 1))
+        try await repo.save(oldImage, imageData: Data([1, 2, 3]))
+        try await repo.togglePin(oldImage.id)
+        for index in 2...25 {
+            let item = ClipboardItem(type: index.isMultiple(of: 2) ? .image : .text,
+                plainText: "clip \(index)", hash: "hash-\(index)", now: Date(timeIntervalSince1970: Double(index)))
+            try await repo.save(item, imageData: item.type == .image ? Data([UInt8(index)]) : nil)
+            let count = try await repo.count()
+            XCTAssertLessThanOrEqual(count, 20, "The limit must hold immediately after each save")
+        }
         let result = try await repo.search()
-        XCTAssertEqual(result.count, 3)
-        XCTAssertTrue(result.contains { $0.id == pin.id })
-        XCTAssertFalse(result.contains { $0.id == old.id })
-        XCTAssertTrue(result.contains { $0.plainText == "new 4" })
+        XCTAssertEqual(result.count, 20)
+        XCTAssertEqual(result.first?.plainText, "clip 25")
+        XCTAssertEqual(result.last?.plainText, "clip 6")
+        XCTAssertFalse(result.contains { $0.id == oldImage.id }, "Pins share the same total budget")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storage.assetURL("old-image.png")!.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storage.assetURL("hash-2.png")!.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storage.assetURL("hash-24.png")!.path))
+        let expiredSearch = try await repo.search("old screenshot")
+        XCTAssertTrue(expiredSearch.isEmpty)
+    }
+    func testRecopyAtCapacityRefreshesOldestWithoutEvictingAnotherClip() async throws {
+        let (repo, _) = try setupStore()
+        for index in 0..<20 { try await repo.save(clip("item \(index)", now: Date(timeIntervalSince1970: Double(index)))) }
+        try await repo.save(clip("item 0", now: Date(timeIntervalSince1970: 50)))
+        var result = try await repo.search()
+        XCTAssertEqual(result.count, 20)
+        XCTAssertEqual(result.first?.plainText, "item 0")
+        try await repo.save(clip("newest", now: Date(timeIntervalSince1970: 51)))
+        result = try await repo.search()
+        XCTAssertEqual(result.count, 20)
+        XCTAssertFalse(result.contains { $0.plainText == "item 1" })
+        XCTAssertTrue(result.contains { $0.plainText == "item 0" })
+    }
+    func testExistingOversizedHistoryIsTrimmedWhenOpened() async throws {
+        let (_, storage) = try setupStore()
+        let database = try DatabaseQueue(path: storage.root.appendingPathComponent("clips.db").path)
+        try await database.write { db in
+            for index in 0..<35 {
+                var item = clip("legacy \(index)", now: Date(timeIntervalSince1970: Double(index)))
+                item.isFavorite = true
+                try item.insert(db)
+            }
+        }
+        let reopened = try ClipboardRepository(storage: storage)
+        let result = try await reopened.search()
+        XCTAssertEqual(result.count, 20)
+        XCTAssertEqual(result.last?.plainText, "legacy 15")
+    }
+    func testEqualTimestampsEvictFirstInserted() async throws {
+        let (repo, _) = try setupStore()
+        for index in 0..<21 { try await repo.save(clip("tie \(index)", now: Date(timeIntervalSince1970: 100))) }
+        let result = try await repo.search()
+        XCTAssertEqual(result.count, 20)
+        XCTAssertEqual(result.first?.plainText, "tie 20")
+        XCTAssertFalse(result.contains { $0.plainText == "tie 0" })
     }
     func testClearDeletesAssetsButKeepsPinnedImages() async throws {
         let (repo, storage) = try setupStore()

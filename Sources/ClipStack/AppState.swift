@@ -9,6 +9,7 @@ final class AppState: ObservableObject {
     let storage: StorageService
     let repository: ClipboardRepository
     let watcher = ClipboardWatcher()
+    let screenshots = ScreenshotWatcher()
     let paste = PasteService()
     let hotkey = HotkeyManager()
     @Published var items: [ClipboardItem] = []
@@ -32,26 +33,22 @@ final class AppState: ObservableObject {
     init() throws {
         storage = try StorageService()
         repository = try ClipboardRepository(storage: storage)
+        screenshots.onCapture = { [weak self] clip in self?.save(clip) }
+        screenshots.onError = { [weak self] message in self?.error = message }
         watcher.onChange = { [weak self] board in self?.capture(board) }
-        settings.$paused.sink { [weak self] paused in self?.watcher.paused = paused }.store(in: &subscriptions)
+        settings.$paused.sink { [weak self] paused in self?.watcher.paused = paused; self?.screenshots.paused = paused }.store(in: &subscriptions)
         settings.$shortcutOption.dropFirst().sink { [weak self] value in self?.registerHotkey(value) }.store(in: &subscriptions)
-        settings.$retentionDays.dropFirst().sink { [weak self] _ in
-            Task { @MainActor in await self?.cleanup() }
-        }.store(in: &subscriptions)
-        settings.$maxItems.dropFirst().sink { [weak self] _ in
-            Task { @MainActor in await self?.cleanup() }
-        }.store(in: &subscriptions)
         hotkey.onPress = { [weak self] in self?.showHistory?() }
         registerHotkey(settings.shortcutOption)
-        if settings.onboarded { watcher.start() }
+        startRecording()
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.cleanup() }
         }
         Task { await cleanup() }
     }
     var selected: ClipboardItem? { items.first { $0.id == selectedID } }
-    func startRecording() { settings.onboarded = true; watcher.start() }
-    func stop() { watcher.stop(); hotkey.stop(); cleanupTimer?.invalidate(); searchTask?.cancel() }
+    func startRecording() { watcher.start(); screenshots.start() }
+    func stop() { watcher.stop(); screenshots.stop(); hotkey.stop(); cleanupTimer?.invalidate(); searchTask?.cancel() }
     private func registerHotkey(_ option: Bool) {
         do { try hotkey.register(useOption: option) } catch { self.error = error.localizedDescription }
     }
@@ -62,11 +59,12 @@ final class AppState: ObservableObject {
         guard let clip = ClipboardParser.parse(board, sourceID: app?.bundleIdentifier,
                 sourceName: app?.localizedName ?? "Unknown app", excludedApps: settings.excludedApps,
                 filterSecrets: settings.filterSecrets), board.changeCount == changeCount else { return }
+        save(clip)
+    }
+    private func save(_ clip: CapturedClip) {
         Task {
             do {
                 try await repository.save(clip.item, imageData: clip.imageData)
-                // Enforce the cap immediately, including during sustained copying.
-                try await repository.cleanup(retentionDays: settings.retentionDays, maxItems: settings.maxItems)
                 refresh()
             } catch { self.error = "Could not save clipboard history. \(error.localizedDescription)" }
         }
@@ -116,7 +114,7 @@ final class AppState: ObservableObject {
         }
     }
     func cleanup() async {
-        do { try await repository.cleanup(retentionDays: settings.retentionDays, maxItems: settings.maxItems); refresh() }
+        do { try await repository.cleanup(); refresh() }
         catch { self.error = error.localizedDescription }
     }
     func useSelected(copyOnly: Bool = false) {

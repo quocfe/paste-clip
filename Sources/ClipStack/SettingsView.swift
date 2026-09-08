@@ -44,13 +44,11 @@ struct SettingsView: View {
                 Text("Without permission, Enter copies the selected clip. Paste it in your app with ⌘V.").font(.caption).foregroundStyle(.secondary)
             } header: { Text("Paste") }
             Section {
-                Picker("Keep history for", selection: $settings.retentionDays) {
-                    Text("1 day").tag(1); Text("7 days").tag(7); Text("30 days").tag(30); Text("Forever").tag(0)
-                }
-                Picker("Maximum unpinned clips", selection: $settings.maxItems) {
-                    Text("1,000").tag(1000); Text("10,000").tag(10000); Text("50,000").tag(50000)
-                }
-                Text("Pinned clips do not expire and are excluded from the limit.").font(.caption).foregroundStyle(.secondary)
+                LabeledContent("Maximum clips", value: "20")
+                Text("Text, images, links, and files share the same 20 slots. Adding a new clip removes the oldest, even if pinned.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("New macOS screenshots are added automatically when saved. Screenshots copied to the clipboard are captured too.")
+                    .font(.caption).foregroundStyle(.secondary)
             } header: { Text("History") }
             Section {
                 Toggle("Skip likely passwords, API keys, tokens, and OTPs", isOn: $settings.filterSecrets)

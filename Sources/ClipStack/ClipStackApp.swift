@@ -37,13 +37,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 return consumed ? nil : event
             }
-            if !state.settings.onboarded || state.error != nil { openHistory() }
+            openHistory()
         } catch {
             let alert = NSAlert(); alert.messageText = "ClipStack could not start"
             alert.informativeText = "Your history has not been changed. \(error.localizedDescription)"
             alert.runModal(); NSApp.terminate(nil)
         }
     }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openHistory(); return true
+    }
+    func applicationDidResignActive(_ notification: Notification) { panel?.orderOut(nil) }
     func applicationWillTerminate(_ notification: Notification) {
         state?.stop()
         if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
@@ -70,10 +74,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let state else { return }
         state.paste.rememberTarget()
         if panel == nil {
-            let panel = HistoryPanel(contentRect: NSRect(x: 0, y: 0, width: 920, height: 610),
-                styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+            let panel = HistoryPanel(contentRect: NSRect(x: 0, y: 0, width: 1200, height: 350),
+                styleMask: [.borderless], backing: .buffered, defer: false)
+            panel.isOpaque = false; panel.backgroundColor = .clear
             panel.title = "ClipStack"; panel.titleVisibility = .hidden; panel.titlebarAppearsTransparent = true
-            panel.isMovableByWindowBackground = true; panel.isReleasedWhenClosed = false
+            panel.isMovableByWindowBackground = false; panel.isReleasedWhenClosed = false
             panel.level = .floating; panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
             panel.standardWindowButton(.closeButton)?.isHidden = true
             panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
@@ -83,10 +88,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main {
             let area = screen.visibleFrame
-            panel?.setFrameOrigin(NSPoint(x: area.midX - 460, y: area.midY - 275))
+            panel?.setFrame(NSRect(x: area.minX, y: area.minY, width: area.width, height: min(350, area.height)), display: true)
         }
         state.refresh(); NSApp.activate(ignoringOtherApps: true); panel?.makeKeyAndOrderFront(nil)
-        NotificationCenter.default.post(name: .clipStackFocusSearch, object: nil)
+        panel?.makeFirstResponder(panel)
     }
     @objc private func togglePause() { state?.settings.paused.toggle() }
     @objc private func toggleLogin() {
@@ -114,7 +119,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func handleKey(_ event: NSEvent) -> NSEvent? {
         guard let state, panel?.isKeyWindow == true else { return event }
         if event.keyCode == 53 { panel?.orderOut(nil); return nil }
-        guard state.settings.onboarded else { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if modifiers.contains(.command) {
             switch event.charactersIgnoringModifiers?.lowercased() {
@@ -127,8 +131,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if event.keyCode == 36 || event.keyCode == 76 { state.useSelected(copyOnly: modifiers.contains(.command)); return nil }
         if modifiers.intersection([.command, .option, .control, .shift]).isEmpty {
-            if event.keyCode == 125 { state.moveSelection(1); return nil }
-            if event.keyCode == 126 { state.moveSelection(-1); return nil }
+            if event.keyCode == 125 || (event.keyCode == 124 && !(panel?.firstResponder is NSTextView)) { state.moveSelection(1); return nil }
+            if event.keyCode == 126 || (event.keyCode == 123 && !(panel?.firstResponder is NSTextView)) { state.moveSelection(-1); return nil }
         }
         return event
     }

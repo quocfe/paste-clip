@@ -2,6 +2,7 @@ import Foundation
 import GRDB
 
 public actor ClipboardRepository {
+    public static let historyLimit = 20
     private let database: DatabaseQueue
     private let storage: StorageService
 
@@ -41,7 +42,12 @@ public actor ClipboardRepository {
             """)
         }
         try migrator.migrate(database)
-        try database.write { db in try db.execute(sql: "PRAGMA secure_delete = ON") }
+        try database.write { db in
+            try db.execute(sql: "PRAGMA secure_delete = ON")
+            try Self.enforceLimit(db)
+        }
+        let names = try database.read { try String.fetchAll($0, sql: "SELECT assetPath FROM clipboard_items WHERE assetPath IS NOT NULL") }
+        try storage.removeOrphans(keeping: Set(names))
     }
 
     public func save(_ incoming: ClipboardItem, imageData: Data? = nil) throws {
@@ -52,9 +58,17 @@ public actor ClipboardRepository {
                 item.id = existing.id; item.createdAt = existing.createdAt
                 item.isFavorite = existing.isFavorite; item.lastUsedAt = existing.lastUsedAt
                 item.useCount = existing.useCount + 1
+                // Spotlight can deliver a screenshot after the same image was copied again.
+                if existing.updatedAt > item.updatedAt {
+                    item.updatedAt = existing.updatedAt
+                    item.sourceAppBundleID = existing.sourceAppBundleID
+                    item.sourceAppName = existing.sourceAppName
+                }
             }
             try item.save(db)
+            try Self.enforceLimit(db)
         }
+        try cleanAssets()
     }
 
     public static func searchPattern(_ query: String) -> String? {
@@ -80,7 +94,7 @@ public actor ClipboardRepository {
             }
             let condition = clauses.isEmpty ? "" : " WHERE " + clauses.joined(separator: " AND ")
             arguments += [max(1, min(limit, 1000)), max(0, offset)]
-            return try ClipboardItem.fetchAll(db, sql: "SELECT * FROM clipboard_items\(condition) ORDER BY updatedAt DESC, id DESC LIMIT ? OFFSET ?", arguments: arguments)
+            return try ClipboardItem.fetchAll(db, sql: "SELECT * FROM clipboard_items\(condition) ORDER BY updatedAt DESC, rowid DESC LIMIT ? OFFSET ?", arguments: arguments)
         }
     }
 
@@ -99,15 +113,13 @@ public actor ClipboardRepository {
         try database.write { try $0.execute(sql: "DELETE FROM clipboard_items" + (includePinned ? "" : " WHERE isFavorite = 0")) }
         try cleanAssets()
     }
-    public func cleanup(retentionDays: Int, maxItems: Int, now: Date = Date()) throws {
-        try database.write { db in
-            if retentionDays > 0 {
-                try db.execute(sql: "DELETE FROM clipboard_items WHERE isFavorite = 0 AND updatedAt < ?", arguments: [now.addingTimeInterval(-Double(retentionDays) * 86400)])
-            }
-            // Pins are exempt; the cap applies to unpinned history.
-            try db.execute(sql: "DELETE FROM clipboard_items WHERE id IN (SELECT id FROM clipboard_items WHERE isFavorite = 0 ORDER BY updatedAt DESC, id DESC LIMIT -1 OFFSET ?)", arguments: [max(1, maxItems)])
-        }
+    public func cleanup() throws {
+        try database.write { try Self.enforceLimit($0) }
         try cleanAssets()
+    }
+    private static func enforceLimit(_ db: Database) throws {
+        // One shared budget for every type, including pinned clips. Ties use insertion order.
+        try db.execute(sql: "DELETE FROM clipboard_items WHERE id IN (SELECT id FROM clipboard_items ORDER BY updatedAt DESC, rowid DESC LIMIT -1 OFFSET ?)", arguments: [historyLimit])
     }
     private func cleanAssets() throws {
         let names = try database.read { try String.fetchAll($0, sql: "SELECT assetPath FROM clipboard_items WHERE assetPath IS NOT NULL") }

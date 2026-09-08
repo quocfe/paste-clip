@@ -10,7 +10,8 @@ let package = Package(
     targets: [
         .target(name: "ClipStackCore", dependencies: [.product(name: "GRDB", package: "GRDB.swift")]),
         .executableTarget(name: "ClipStack", dependencies: ["ClipStackCore"]),
-        .testTarget(name: "ClipStackCoreTests", dependencies: ["ClipStackCore"])
+        .testTarget(name: "ClipStackCoreTests", dependencies: ["ClipStackCore"]),
+        .testTarget(name: "ClipStackUITests", dependencies: ["ClipStack"])
     ],
     swiftLanguageModes: [.v5]
 )

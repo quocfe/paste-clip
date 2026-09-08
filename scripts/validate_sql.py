@@ -11,7 +11,6 @@ import unittest
 SOURCE = (Path(__file__).resolve().parents[1] / 'Sources/ClipStackCore/ClipboardRepository.swift').read_text(encoding='utf-8')
 MIGRATION = re.search(r'try db.execute\(sql: """\n(.*?)\n\s*"""\)', SOURCE, re.S).group(1)
 CAP_SQL = re.search(r'try db.execute\(sql: "(DELETE FROM clipboard_items WHERE id IN.*?)", arguments:', SOURCE).group(1)
-RETENTION_SQL = re.search(r'try db.execute\(sql: "(DELETE FROM clipboard_items WHERE isFavorite = 0 AND updatedAt < \?)"', SOURCE).group(1)
 
 class DatabaseInvariants(unittest.TestCase):
     def setUp(self):
@@ -43,15 +42,14 @@ class DatabaseInvariants(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             self.insert(1, 'hello again')
 
-    def test_retention_and_cap_preserve_pins(self):
+    def test_cap_includes_pins(self):
         self.insert(1, 'old', '2026-01-01 00:00:00')
         self.insert(2, 'pinned', '2026-01-01 00:00:00', True)
         for i in range(3, 10):
             self.insert(i, f'clip {i}', f'2026-09-0{i} 00:00:00')
-        self.db.execute(RETENTION_SQL, ('2026-08-01 00:00:00',))
         self.db.execute(CAP_SQL, (2,))
         ids = {row[0] for row in self.db.execute('SELECT id FROM clipboard_items')}
-        self.assertEqual(ids, {'2', '8', '9'})
+        self.assertEqual(ids, {'8', '9'})
         self.assertEqual(self.search('old'), [])
 
     def test_search_at_50000_clips(self):
