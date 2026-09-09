@@ -167,3 +167,7 @@ The tap is deliberately generated from an actual artifact; this repo does not sh
 ## API references
 
 The clipboard watcher follows Apple's [NSPasteboard change-count contract](https://developer.apple.com/documentation/appkit/nspasteboard/changecount). Login registration uses [SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice/register()). Persistence uses [GRDB](https://github.com/groue/GRDB.swift), pinned to 7.8.0. The selected CI toolchain is listed in the [macOS 15 runner image](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md).
+
+## License
+
+ClipStack is open source under the [MIT License](LICENSE).
