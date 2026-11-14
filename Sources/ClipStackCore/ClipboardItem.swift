@@ -1,19 +1,35 @@
-import Foundation
 import CryptoKit
+import Foundation
 import GRDB
 
 public enum ClipKind: String, Codable, CaseIterable, Sendable, DatabaseValueConvertible {
     case text, link, richText, image, file
     public var label: String {
-        switch self { case .text: return "Text"; case .link: return "Link"; case .richText: return "Rich text"; case .image: return "Image"; case .file: return "Files" }
+        switch self {
+        case .text: return "Text"
+        case .link: return "Link"
+        case .richText: return "Rich text"
+        case .image: return "Image"
+        case .file: return "Files"
+        }
     }
     public var symbol: String {
-        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .richText: return "textformat"; case .image: return "photo"; case .file: return "doc" }
+        switch self {
+        case .text: return "text.alignleft"
+        case .link: return "link"
+        case .richText: return "textformat"
+        case .image: return "photo"
+        case .file: return "doc"
+        }
     }
 }
 
 public enum HistoryFilter: String, CaseIterable, Sendable {
-    case all = "All", pinned = "Pinned", images = "Images", links = "Links", files = "Files"
+    case all = "All"
+    case pinned = "Pinned"
+    case images = "Images"
+    case links = "Links"
+    case files = "Files"
 }
 
 public struct ClipboardItem: Codable, FetchableRecord, PersistableRecord, Identifiable, Sendable {
@@ -36,20 +52,34 @@ public struct ClipboardItem: Codable, FetchableRecord, PersistableRecord, Identi
     public var lastUsedAt: Date?
     public var useCount: Int
 
-    public init(type: ClipKind, plainText: String, hash: String, sourceID: String? = nil,
-                sourceName: String = "Unknown app", html: Data? = nil, rtf: Data? = nil,
-                assetPath: String? = nil, filePaths: String? = nil, url: String? = nil,
-                now: Date = Date()) {
-        id = UUID().uuidString; self.type = type; self.plainText = plainText
-        contentHash = hash; sourceAppBundleID = sourceID; sourceAppName = sourceName
-        self.html = html; self.rtf = rtf; self.assetPath = assetPath
-        self.filePaths = filePaths; self.url = url; isFavorite = false; isSensitive = false
-        createdAt = now; updatedAt = now; useCount = 1
+    public init(
+        type: ClipKind, plainText: String, hash: String, sourceID: String? = nil,
+        sourceName: String = "Unknown app", html: Data? = nil, rtf: Data? = nil,
+        assetPath: String? = nil, filePaths: String? = nil, url: String? = nil,
+        now: Date = Date()
+    ) {
+        id = UUID().uuidString
+        self.type = type
+        self.plainText = plainText
+        contentHash = hash
+        sourceAppBundleID = sourceID
+        sourceAppName = sourceName
+        self.html = html
+        self.rtf = rtf
+        self.assetPath = assetPath
+        self.filePaths = filePaths
+        self.url = url
+        isFavorite = false
+        isSensitive = false
+        createdAt = now
+        updatedAt = now
+        useCount = 1
     }
 
     public var files: [URL] {
         guard let filePaths, let data = filePaths.data(using: .utf8),
-              let paths = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            let paths = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
         return paths.compactMap(URL.init(string:))
     }
     public var title: String {

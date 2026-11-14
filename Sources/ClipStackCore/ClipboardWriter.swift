@@ -16,7 +16,9 @@ public enum ClipboardWriter {
     public static func write(_ clip: ClipboardItem, storage: StorageService, to board: NSPasteboard = .general) throws {
         var objects: [NSPasteboardWriting] = []
         if clip.type == .file {
-            guard !clip.files.isEmpty, clip.files.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) else { throw ClipboardWriteError.missingFiles }
+            guard !clip.files.isEmpty, clip.files.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) else {
+                throw ClipboardWriteError.missingFiles
+            }
             for url in clip.files {
                 let item = NSPasteboardItem()
                 item.setString(url.absoluteString, forType: .fileURL)
@@ -27,7 +29,8 @@ public enum ClipboardWriter {
             let item = NSPasteboardItem()
             item.setString("1", forType: ClipboardParser.ownMarker)
             if clip.type == .image {
-                guard let name = clip.assetPath, let url = storage.assetURL(name), let data = try? Data(contentsOf: url) else { throw ClipboardWriteError.missingAsset }
+                guard let name = clip.assetPath, let url = storage.assetURL(name), let data = try? Data(contentsOf: url)
+                else { throw ClipboardWriteError.missingAsset }
                 item.setData(data, forType: .png)
             } else {
                 item.setString(clip.plainText, forType: .string)

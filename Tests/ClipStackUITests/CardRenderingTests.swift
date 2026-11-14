@@ -1,7 +1,8 @@
-import XCTest
-import SwiftUI
 import AppKit
 import ClipStackCore
+import SwiftUI
+import XCTest
+
 @testable import ClipStack
 
 /// Render production card views with synthetic test data only. No AppState, app launch,
@@ -12,24 +13,40 @@ final class CardRenderingTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let storage = try StorageService(root: root)
         defer { try? FileManager.default.removeItem(at: root) }
-        let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 160, pixelsHigh: 100,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 640, bitsPerPixel: 32))
+        let bitmap = try XCTUnwrap(
+            NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: 160, pixelsHigh: 100,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 640, bitsPerPixel: 32))
         let pixels = try XCTUnwrap(bitmap.bitmapData)
-        for y in 0..<100 { for x in 0..<160 {
-            let offset = y * bitmap.bytesPerRow + x * 4
-            pixels[offset] = UInt8(x * 255 / 160)
-            pixels[offset + 1] = 115
-            pixels[offset + 2] = UInt8(y * 255 / 100)
-            pixels[offset + 3] = 255
-        } }
-        let imageName = try storage.storeImage(XCTUnwrap(bitmap.representation(using: .png, properties: [:])), hash: "render-fixture")
-        let now = Date(timeIntervalSince1970: 1788878580)
+        for y in 0..<100 {
+            for x in 0..<160 {
+                let offset = y * bitmap.bytesPerRow + x * 4
+                pixels[offset] = UInt8(x * 255 / 160)
+                pixels[offset + 1] = 115
+                pixels[offset + 2] = UInt8(y * 255 / 100)
+                pixels[offset + 3] = 255
+            }
+        }
+        let imageName = try storage.storeImage(
+            XCTUnwrap(bitmap.representation(using: .png, properties: [:])), hash: "render-fixture")
+        // Cards never decode assets while rendering; a synchronous render needs a warm cache.
+        XCTAssertNotNil(ThumbnailCache.shared.load(try XCTUnwrap(storage.assetURL(imageName))))
+        let now = Date(timeIntervalSince1970: 1_788_878_580)
         let clips = [
-            ClipboardItem(type: .text, plainText: "Copy once.\nKeep your flow.", hash: "short", sourceName: "Notes", now: now),
-            ClipboardItem(type: .image, plainText: "Image · 160 × 100", hash: "image", sourceName: "Screenshot", assetPath: imageName, now: now),
-            ClipboardItem(type: .text, plainText: "Lưu tối đa 20 mục, gồm cả text và ảnh. Khi có mục mới, ClipStack tự động xóa mục cũ nhất.\n\nẢnh chụp màn hình mới sẽ xuất hiện ở đây.", hash: "long", sourceName: "TextEdit", now: now),
-            ClipboardItem(type: .link, plainText: "https://example.com/design/clipboard", hash: "link", sourceName: "Safari", now: now)
+            ClipboardItem(
+                type: .text, plainText: "Copy once.\nKeep your flow.", hash: "short", sourceName: "Notes", now: now),
+            ClipboardItem(
+                type: .image, plainText: "Image · 160 × 100", hash: "image", sourceName: "Screenshot",
+                assetPath: imageName, now: now),
+            ClipboardItem(
+                type: .text,
+                plainText:
+                    "Lưu tối đa 20 mục, gồm cả text và ảnh. Khi có mục mới, ClipStack tự động xóa mục cũ nhất.\n\nẢnh chụp màn hình mới sẽ xuất hiện ở đây.",
+                hash: "long", sourceName: "TextEdit", now: now),
+            ClipboardItem(
+                type: .link, plainText: "https://example.com/design/clipboard", hash: "link", sourceName: "Safari",
+                now: now),
         ]
         for scheme in [ColorScheme.light, .dark] {
             let view = HStack(spacing: 14) {

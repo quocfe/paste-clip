@@ -6,6 +6,31 @@ ClipStack opens as a full-width shelf at the bottom of the active screen, with h
 
 History has one fixed budget of **20 clips total**, across text, images, links, files, and pinned items. A new unique clip evicts the least recently copied clip and removes its saved image. Re-copying an existing clip moves it to the front. Existing histories are trimmed to 20 on first launch of this version.
 
+## Install
+
+### Download
+
+1. Download `ClipStack-<version>.zip` from the [latest release](https://github.com/quocfe/paste-clip/releases/latest), unzip it, and move **ClipStack.app** to Applications.
+2. Open it. Releases are not notarized by Apple yet, so macOS blocks the first launch. Open **System Settings → Privacy & Security** and choose **Open Anyway**, or run:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/ClipStack.app
+   ```
+
+3. Press ⌘⇧V to open the shelf. For automatic paste, open ClipStack's Settings and enable Accessibility; macOS may ask for this again after an update.
+
+Requires macOS 13 or later, on Apple Silicon or Intel.
+
+### Build from source
+
+With Xcode 16.4 or newer installed, a locally built app is not blocked by macOS:
+
+```bash
+git clone https://github.com/quocfe/paste-clip.git && cd paste-clip && bash scripts/build-local.sh && open build/ClipStack.app
+```
+
+Move `build/ClipStack.app` to Applications to keep it. Details and the universal build are below.
+
 ## Build and run on a Mac
 
 Install full Xcode 16.4 or newer, select it as the active developer directory, and accept its license. The package requires a Swift 6 toolchain and uses Swift 5 language mode for the app. Build tools need macOS supported by that Xcode; the resulting application targets macOS 13+.
@@ -15,6 +40,12 @@ For a local build for this Mac, without XcodeGen:
 ```bash
 bash scripts/build-local.sh
 open build/ClipStack.app
+```
+
+That build is ad-hoc signed, so macOS forgets the Accessibility grant after every rebuild. To keep it, sign with a stable identity from your keychain:
+
+```bash
+CLIPSTACK_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" bash scripts/build-local.sh
 ```
 
 For a universal Apple Silicon + Intel build:
@@ -38,14 +69,14 @@ Select the ClipStack scheme and My Mac. Use the `.app` bundle for login registra
 ## Included behavior
 
 - Recording starts on launch. Clipboard changes are checked every 250 ms; the existing clipboard is not imported on startup or when resuming.
-- New macOS screenshot files are imported automatically. The default Desktop and configured screenshot folder are checked every 750 ms; Spotlight also detects screenshots saved elsewhere in the home folder. Only files marked by macOS as screenshots are imported. Folder access may need to be allowed in Privacy & Security → Files and Folders. Screenshots taken while paused or before launch are not backfilled. The original files and system clipboard are left untouched.
-- Text, HTTP(S) links, plain text with HTML/RTF representations, PNG/TIFF images, and multiple Finder file URLs are captured. Images are normalized to PNG on disk. Original files are referenced, never copied or deleted.
+- New macOS screenshot files are imported automatically. The default Desktop and configured screenshot folder are checked every 750 ms; Spotlight also detects screenshots saved elsewhere in the home folder. While the floating thumbnail is on screen, macOS holds a new screenshot in a temporary folder for about five seconds before saving it. ClipStack reads it there when the system allows, which also means a screenshot discarded from the thumbnail is still kept. macOS 26 denies access to that folder, so there the screenshot appears once the thumbnail goes away; turn off Show Floating Thumbnail (⌘⇧5 → Options) for instant import. Otherwise only files marked by macOS as screenshots are imported. Folder access may need to be allowed in Privacy & Security → Files and Folders. Import can be turned off in Settings; screenshots taken while it is off, while paused, or before launch are not backfilled. The original files and system clipboard are left untouched.
+- Text, HTTP(S) links, plain text with HTML/RTF representations, PNG/TIFF images, and multiple Finder file URLs are captured. Images are normalized to PNG on disk, off the main thread. Text that an app copies together with a rendered picture and an RTF representation (spreadsheets, word processors) is kept as text. Original files are referenced, never copied or deleted.
 - SHA-256 deduplication includes content type and rich representations. Re-copying retains the clip ID and pin, refreshes recency, and increments the copies/uses count.
 - FTS5 searches text, source app name, URL, and file URLs using safe token-prefix AND queries. Results load in pages. Punctuation-only queries return no results.
-- The bottom shelf has horizontally scrolling preview cards, All, Pinned, Images, Links, and Files filters, source app icons, relative times, pin/delete actions, a context menu, and drag-out support. It opens on launch, on app reopen, or with the global shortcut. Escape and switching to another app dismiss it.
+- The bottom shelf has horizontally scrolling preview cards, All, Pinned, Images, Links, and Files filters, source app icons, pin/delete actions, a context menu, and drag-out support. It opens on launch (but stays in the menu bar when started at login), on app reopen, or with the global shortcut. Escape and switching to another app dismiss it.
 - Global ⌘⇧V opens the panel; ⌘⌥V is available as an alternative. A registration conflict is shown as an error.
 - Enter restores the selected item, activates the previous app, waits for focus and released modifiers, then sends Cmd+V. Without Accessibility permission, the item is copied and the panel explains the manual fallback.
-- Preferences include launch at login, pause, excluded applications, optional secret heuristics, and clear history with an explicit option to include pins. The total history limit is fixed at 20; pinning helps filtering but does not exempt a clip from eviction.
+- Preferences include launch at login, pause, screenshot import, excluded applications, optional secret heuristics, and clear history with an explicit option to include pins. The total history limit is fixed at 20; pinning helps filtering but does not exempt a clip from eviction.
 - Menu bar controls open history, pause/resume, clear unpinned history, open settings, toggle login startup, and quit. No Dock icon is used.
 - The UI follows the system light/dark appearance. No sample clipboard content is inserted.
 
@@ -74,7 +105,7 @@ The app contains no networking or analytics code. SQLite stores text, rich repre
 
 Transient, concealed, autogenerated, and ClipStack-restored pasteboards are always skipped. Common password managers are excluded by bundle ID before reading content. Users can add installed apps to that list.
 
-The optional secret heuristic detects several private-key headers, common API-token prefixes, JWTs, credential assignments, and 4–8 digit numbers. It cannot identify all secrets, inspect image contents, or guarantee that a copied password will be excluded. It can produce false positives. Pause recording or exclude the source app for sensitive workflows.
+The optional secret heuristic detects several private-key headers, common API-token prefixes, JWTs, credential assignments, and 4–8 digit numbers. It cannot identify all secrets, inspect image contents, or guarantee that a copied password will be excluded. It can produce false positives; when it skips a copy, the shelf's status line says so. Pause recording or exclude the source app for sensitive workflows.
 
 Eviction uses last-copy time (`updatedAt`), preserving recent recopies. All types and pins share the 20-item cap, enforced inside each save transaction and when opening an existing database. There is no age-based expiry. Cleanup also runs every minute; unreferenced images are removed only from ClipStack's asset directory. Clearing history does not clear the current system clipboard.
 
@@ -96,6 +127,7 @@ Sources/ClipStack/
   ClipStackApp.swift         App lifecycle, NSPanel, NSStatusItem, keyboard events
   AppState.swift             Capture/search orchestration and selection
   HistoryView.swift          Welcome, history, rows, preview
+  ThumbnailCache.swift       Downsampled, cached image previews
   SettingsView.swift         Privacy/history settings + SMAppService
   SettingsStore.swift        Persisted preferences
   HotkeyManager.swift        Carbon global hotkey registration
@@ -109,9 +141,12 @@ The repository is actor-isolated, so database operations and asset cleanup seria
 ```bash
 swift test
 python3 scripts/validate_sql.py
+swift format lint --recursive Sources Tests
 ```
 
-The Swift suite covers persistence, deduplication/pins, FTS triggers, the shared 20-clip cap, migration of larger histories, timestamp ties, image cleanup, path validation, pagination, private markers, rich clipboard restoration, files, PNG capture, screenshot detection/retries, pause/resume, and secret filtering. It uses temporary databases and uniquely named pasteboards instead of the user's general clipboard.
+Sources follow the repository's `.swift-format` configuration; run `swift format --in-place --recursive Sources Tests` before committing.
+
+The Swift suite covers persistence, deduplication/pins, FTS triggers, the shared 20-clip cap, migration of larger histories, timestamp ties, image cleanup, path validation, pagination, private markers, rich clipboard restoration, files, PNG capture, screenshot detection/retries, pause/resume, secret filtering, skip reasons, deferred image decoding, settings persistence, and the thumbnail cache. It uses temporary databases and uniquely named pasteboards instead of the user's general clipboard.
 
 The UI rendering test renders the production text/image cards in light and dark appearances using synthetic fixtures. It checks dimensions and image pixels without starting the application or accessing the global clipboard. Set `CLIPSTACK_PREVIEW_OUTPUT` to a directory when running `swift test --filter CardRenderingTests` to export the PNG previews.
 
@@ -131,9 +166,17 @@ Before release, perform these macOS checks:
 8. Register launch at login from an installed `.app`, log out/in, and verify startup.
 9. Test missing original files, large payloads, multiple displays/Spaces, and signed/notarized installation on a clean Mac.
 
-## Signed release and Homebrew
+## Releases and Homebrew
 
-The release workflow runs for `vMAJOR.MINOR.PATCH` tags. Configure the GitHub `release` environment and these secrets first:
+The release workflow runs for `vMAJOR.MINOR.PATCH` tags:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+By default it tests, builds the universal app with an ad-hoc signature, and publishes `ClipStack-<version>.zip` and `SHA256SUMS` to GitHub Releases with install instructions. No secrets are needed; users allow the app once as described under Install. The same package can be made locally with `RELEASE_VERSION=v0.1.0 bash scripts/release-unsigned.sh`.
+
+For a Developer ID signed and notarized release, set the repository variable `SIGNED_RELEASE` to `true`, then configure the GitHub `release` environment and these secrets:
 
 | Secret | Value |
 | --- | --- |
@@ -144,7 +187,7 @@ The release workflow runs for `vMAJOR.MINOR.PATCH` tags. Configure the GitHub `r
 | `APPLE_ID` | Apple ID used for notarization |
 | `APPLE_APP_PASSWORD` | App-specific password for notarytool |
 
-After the macOS checks pass, push a version tag to invoke the workflow. It creates a temporary signing keychain, tests, archives both architectures with Hardened Runtime, verifies signing, submits with `notarytool`, staples/validates the ticket, assesses with Gatekeeper, and publishes `ClipStack-<version>.zip`, `SHA256SUMS`, and `clipstack.rb` to GitHub Releases. Certificates are removed from the runner at exit. No signing secrets belong in the repository.
+With `SIGNED_RELEASE` set, the tag invokes the signed job instead. It creates a temporary signing keychain, tests, archives both architectures with Hardened Runtime, verifies signing, submits with `notarytool`, staples/validates the ticket, assesses with Gatekeeper, and publishes `ClipStack-<version>.zip`, `SHA256SUMS`, and `clipstack.rb` to GitHub Releases. Certificates are removed from the runner at exit. No signing secrets belong in the repository.
 
 The generated cask has the real archive SHA-256 and repository URL. To generate it manually from a completed signed archive:
 

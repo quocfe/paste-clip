@@ -1,5 +1,6 @@
-import XCTest
 import GRDB
+import XCTest
+
 @testable import ClipStackCore
 
 final class RepositoryTests: XCTestCase {
@@ -10,7 +11,9 @@ final class RepositoryTests: XCTestCase {
         return (try ClipboardRepository(storage: storage), storage)
     }
     private func clip(_ text: String, now: Date = Date()) -> ClipboardItem {
-        ClipboardItem(type: .text, plainText: text, hash: ContentHash.make(kind: .text, parts: [Data(text.utf8)]), sourceName: "Terminal", now: now)
+        ClipboardItem(
+            type: .text, plainText: text, hash: ContentHash.make(kind: .text, parts: [Data(text.utf8)]),
+            sourceName: "Terminal", now: now)
     }
 
     func testDeduplicationPreservesIdentityAndPin() async throws {
@@ -42,7 +45,8 @@ final class RepositoryTests: XCTestCase {
         let prefix = try await repo.search("dock comp")
         let source = try await repo.search("terminal")
         let punctuation = try await repo.search("\" OR *")
-        XCTAssertEqual(prefix.map(\.id), [item.id]); XCTAssertEqual(source.count, 1)
+        XCTAssertEqual(prefix.map(\.id), [item.id])
+        XCTAssertEqual(source.count, 1)
         XCTAssertTrue(punctuation.isEmpty)
         try await repo.togglePin(item.id)
         let pinned = try await repo.search("docker", filter: .pinned)
@@ -53,11 +57,13 @@ final class RepositoryTests: XCTestCase {
     }
     func testTwentyClipLimitIncludesPinsAndMixedTypesAndDeletesOldAssets() async throws {
         let (repo, storage) = try setupStore()
-        let oldImage = ClipboardItem(type: .image, plainText: "old screenshot", hash: "old-image", now: Date(timeIntervalSince1970: 1))
+        let oldImage = ClipboardItem(
+            type: .image, plainText: "old screenshot", hash: "old-image", now: Date(timeIntervalSince1970: 1))
         try await repo.save(oldImage, imageData: Data([1, 2, 3]))
         try await repo.togglePin(oldImage.id)
         for index in 2...25 {
-            let item = ClipboardItem(type: index.isMultiple(of: 2) ? .image : .text,
+            let item = ClipboardItem(
+                type: index.isMultiple(of: 2) ? .image : .text,
                 plainText: "clip \(index)", hash: "hash-\(index)", now: Date(timeIntervalSince1970: Double(index)))
             try await repo.save(item, imageData: item.type == .image ? Data([UInt8(index)]) : nil)
             let count = try await repo.count()
@@ -76,7 +82,9 @@ final class RepositoryTests: XCTestCase {
     }
     func testRecopyAtCapacityRefreshesOldestWithoutEvictingAnotherClip() async throws {
         let (repo, _) = try setupStore()
-        for index in 0..<20 { try await repo.save(clip("item \(index)", now: Date(timeIntervalSince1970: Double(index)))) }
+        for index in 0..<20 {
+            try await repo.save(clip("item \(index)", now: Date(timeIntervalSince1970: Double(index))))
+        }
         try await repo.save(clip("item 0", now: Date(timeIntervalSince1970: 50)))
         var result = try await repo.search()
         XCTAssertEqual(result.count, 20)
@@ -115,7 +123,8 @@ final class RepositoryTests: XCTestCase {
         let first = ClipboardItem(type: .image, plainText: "first", hash: "first")
         let pin = ClipboardItem(type: .image, plainText: "pinned", hash: "pinned")
         try await repo.save(first, imageData: Data([1, 2, 3]))
-        try await repo.save(pin, imageData: Data([4, 5, 6])); try await repo.togglePin(pin.id)
+        try await repo.save(pin, imageData: Data([4, 5, 6]))
+        try await repo.togglePin(pin.id)
         try await repo.clear()
         let remaining = try await repo.count()
         XCTAssertEqual(remaining, 1)
@@ -126,7 +135,8 @@ final class RepositoryTests: XCTestCase {
     }
     func testPersistenceAndRichPayload() async throws {
         let (repo, storage) = try setupStore()
-        let item = ClipboardItem(type: .richText, plainText: "hello", hash: "rich", html: Data("<b>hello</b>".utf8), rtf: Data([1, 2]))
+        let item = ClipboardItem(
+            type: .richText, plainText: "hello", hash: "rich", html: Data("<b>hello</b>".utf8), rtf: Data([1, 2]))
         try await repo.save(item)
         let reopened = try ClipboardRepository(storage: storage)
         let result = try await reopened.search("hello")
@@ -135,10 +145,13 @@ final class RepositoryTests: XCTestCase {
     }
     func testTypeFiltersAndPagination() async throws {
         let (repo, _) = try setupStore()
-        for index in 0..<7 { try await repo.save(clip("clip \(index)", now: Date(timeIntervalSince1970: Double(index)))) }
+        for index in 0..<7 {
+            try await repo.save(clip("clip \(index)", now: Date(timeIntervalSince1970: Double(index))))
+        }
         let first = try await repo.search(limit: 3)
         let next = try await repo.search(limit: 3, offset: 3)
-        XCTAssertEqual(first.count, 3); XCTAssertEqual(next.count, 3)
+        XCTAssertEqual(first.count, 3)
+        XCTAssertEqual(next.count, 3)
         XCTAssertTrue(Set(first.map(\.id)).isDisjoint(with: next.map(\.id)))
         let images = try await repo.search(filter: .images)
         XCTAssertTrue(images.isEmpty)

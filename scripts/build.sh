@@ -7,6 +7,7 @@ xcodegen generate
 swift test
 xcodebuild -project ClipStack.xcodeproj -scheme ClipStack -configuration Release \
   -derivedDataPath build/DerivedData -destination 'generic/platform=macOS' \
-  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
+  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO \
+  ${MARKETING_VERSION:+MARKETING_VERSION="$MARKETING_VERSION"} build
 codesign --force --deep --sign - build/DerivedData/Build/Products/Release/ClipStack.app
 echo 'Built: build/DerivedData/Build/Products/Release/ClipStack.app'

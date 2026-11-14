@@ -4,7 +4,11 @@ public final class StorageService: @unchecked Sendable {
     public let root: URL
     public let assets: URL
     public init(root: URL? = nil) throws {
-        self.root = try root ?? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent("ClipStack", isDirectory: true)
+        self.root =
+            try root
+            ?? FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+            ).appendingPathComponent("ClipStack", isDirectory: true)
         assets = self.root.appendingPathComponent("assets", isDirectory: true)
         try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: self.root.path)
@@ -24,7 +28,8 @@ public final class StorageService: @unchecked Sendable {
         return assets.appendingPathComponent(name)
     }
     public func removeOrphans(keeping names: Set<String>) throws {
-        for file in try FileManager.default.contentsOfDirectory(at: assets, includingPropertiesForKeys: nil) where !names.contains(file.lastPathComponent) {
+        for file in try FileManager.default.contentsOfDirectory(at: assets, includingPropertiesForKeys: nil)
+        where !names.contains(file.lastPathComponent) {
             try FileManager.default.removeItem(at: file)
         }
     }

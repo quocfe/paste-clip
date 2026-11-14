@@ -6,7 +6,9 @@ final class PasteService {
     private(set) var previousApp: NSRunningApplication?
     var isTrusted: Bool { AXIsProcessTrusted() }
     func rememberTarget() {
-        if let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+        if let app = NSWorkspace.shared.frontmostApplication,
+            app.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        {
             previousApp = app
         }
     }
@@ -27,10 +29,13 @@ final class PasteService {
                 let flags = CGEventSource.flagsState(.combinedSessionState)
                 if !flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl]).isEmpty { continue }
                 guard let source = CGEventSource(stateID: .privateState),
-                      let down = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
-                      let up = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else { return false }
-                down.flags = .maskCommand; up.flags = .maskCommand
-                down.postToPid(target.processIdentifier); up.postToPid(target.processIdentifier)
+                    let down = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
+                    let up = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false)
+                else { return false }
+                down.flags = .maskCommand
+                up.flags = .maskCommand
+                down.postToPid(target.processIdentifier)
+                up.postToPid(target.processIdentifier)
                 return true
             }
         }

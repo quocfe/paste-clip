@@ -4,6 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 swift build -c release
 swift scripts/make-icon.swift
+# Ad-hoc signatures change with every build, which makes macOS forget the Accessibility grant.
+# Set CLIPSTACK_SIGN_IDENTITY to a stable code-signing identity from your keychain to keep it.
+IDENTITY="${CLIPSTACK_SIGN_IDENTITY:--}"
 BIN_DIR="$(swift build -c release --show-bin-path)"
 APP='build/ClipStack.app'
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -13,7 +16,7 @@ cp Resources/ClipStack.icns "$APP/Contents/Resources/ClipStack.icns"
 for resource in "$BIN_DIR"/*.bundle; do
   [[ -d "$resource" ]] || continue
   ditto "$resource" "$APP/Contents/MacOS/$(basename "$resource")"
-  codesign --force --sign - "$APP/Contents/MacOS/$(basename "$resource")"
+  codesign --force --sign "$IDENTITY" "$APP/Contents/MacOS/$(basename "$resource")"
 done
 python3 - "$APP" <<'PY'
 import plistlib, sys
@@ -25,6 +28,6 @@ info.update(CFBundleExecutable='ClipStack', CFBundleIdentifier='com.quocfe.ClipS
 with (Path(sys.argv[1]) / 'Contents/Info.plist').open('wb') as output:
     plistlib.dump(info, output)
 PY
-codesign --force --sign - --options runtime --entitlements Resources/ClipStack.entitlements "$APP"
+codesign --force --sign "$IDENTITY" --options runtime --entitlements Resources/ClipStack.entitlements "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
-echo "Built: $APP (local development signature)"
+echo "Built: $APP (signed with: $IDENTITY)"

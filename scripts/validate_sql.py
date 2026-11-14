@@ -9,8 +9,8 @@ import time
 import unittest
 
 SOURCE = (Path(__file__).resolve().parents[1] / 'Sources/ClipStackCore/ClipboardRepository.swift').read_text(encoding='utf-8')
-MIGRATION = re.search(r'try db.execute\(sql: """\n(.*?)\n\s*"""\)', SOURCE, re.S).group(1)
-CAP_SQL = re.search(r'try db.execute\(sql: "(DELETE FROM clipboard_items WHERE id IN.*?)", arguments:', SOURCE).group(1)
+MIGRATION = re.search(r'db\.execute\(\s*sql: """\n(.*?)\n\s*"""\)', SOURCE, re.S).group(1)
+CAP_SQL = re.search(r'db\.execute\(\s*sql:\s*"(DELETE FROM clipboard_items WHERE id IN.*?)",\s*arguments:', SOURCE).group(1)
 
 class DatabaseInvariants(unittest.TestCase):
     def setUp(self):

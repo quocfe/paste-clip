@@ -1,11 +1,32 @@
-name: Signed macOS release
+name: macOS release
 on:
   push:
     tags: ['v*']
 permissions:
   contents: write
 jobs:
-  release:
+  # Default: an ad-hoc signed build that users allow once in Privacy & Security.
+  unsigned:
+    if: vars.SIGNED_RELEASE != 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+      - run: brew install xcodegen
+      - name: Test, build, and package
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: bash scripts/release-unsigned.sh
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_VERSION" "build/ClipStack-${RELEASE_VERSION#v}.zip" build/SHA256SUMS --verify-tag --notes-file build/RELEASE_NOTES.md --generate-notes
+
+  # Set the repository variable SIGNED_RELEASE=true once the Developer ID secrets exist.
+  signed:
+    if: vars.SIGNED_RELEASE == 'true'
     runs-on: macos-15
     environment: release
     steps:
